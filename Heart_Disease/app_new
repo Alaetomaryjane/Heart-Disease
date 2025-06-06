@@ -1,0 +1,141 @@
+import streamlit as st
+import pickle
+import numpy as np
+# Add this at the very top of your script (first import)
+import warnings
+warnings.filterwarnings("ignore", message=".*use_container_width=True*")
+
+# Load saved model and preprocessing objects
+with open("model.pkl", "rb") as model_file:
+    model = pickle.load(model_file)
+
+with open("ChestPainType_encoder.pkl", "rb") as encoder_file:
+    ChestPainType_encoder = pickle.load(encoder_file)
+
+with open("ExerciseAngina_encoder.pkl", "rb") as encoder_file:
+    ExerciseAngina_encoder = pickle.load(encoder_file)
+
+with open("ST_Slope_encoder.pkl", "rb") as encoder_file:
+    Slope_encoder = pickle.load(encoder_file)
+
+# Set Page Config
+st.set_page_config(page_title="Heart Disease Prediction", page_icon="❤️", layout="centered")
+
+# Apply custom CSS for light theme
+st.markdown(
+    """
+    <style>
+        body, .stApp {
+            background-color: #f5f5f5;  /* Light background */
+            color: #333333;
+        }
+        .stSidebar {
+            background-color: #ffffff !important;
+            padding: 20px;
+            border-right: 1px solid #e0e0e0;
+        }
+        .stSidebar h1, .stSidebar h2, .stSidebar h3 {
+            color: #2e7d32;  /* Dark green */
+        }
+        .stButton>button {
+            background-color: #4caf50;  /* Green */
+            color: white;
+            font-weight: bold;
+            border-radius: 10px;
+            padding: 12px 20px;
+            transition: 0.3s;
+            border: none;
+        }
+        .stButton>button:hover {
+            background-color: #388e3c;  /* Darker green */
+        }
+        .prediction-box {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: #2e7d32;  /* Dark green */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #e0e0e0;
+        }
+        .stTitle {
+            color: #1b5e20;  /* Darker green */
+        }
+        .stSelectbox label, .stTextInput label {
+            color: #333333;
+            font-weight: bold;
+        }
+        .stMarkdown {
+            color: #333333;
+        }
+        .css-1aumxhk {
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Title
+st.title("Heart Disease Prediction App")
+
+# Introduction Section
+st.markdown(
+    """
+    **🔍 About This Model:**  
+    This AI-powered application predicts the likelihood of heart disease based on key patient health indicators.  
+    The model is a **Logistic Regression classifier**, trained on a dataset of medical records.  
+
+    **🩺 Input Fields Explained:**  
+    - **ST Slope:** Shape of the ST segment in an ECG reading (`Up`, `Flat`, `Down`).  
+    - **Chest Pain Type:** The type of chest pain experienced (`Typical Angina`, `Atypical Angina`, etc.).  
+    - **Exercise-Induced Angina:** Whether the patient experiences chest pain during exercise (`Yes` or `No`).  
+    - **Oldpeak (ST Depression):** Deviation in ECG readings (ranges from **0.0 to 6.0**).  
+    - **Max Heart Rate Achieved:** The highest heart rate recorded during exercise (**between 60 and 220 bpm**).  
+    """
+)
+
+# Sidebar inputs
+st.sidebar.header("Enter Patient Details")
+
+# Feature inputs
+st_slope = st.sidebar.selectbox("ST Slope", ["Up", "Flat", "Down"])
+chest_pain = st.sidebar.selectbox("Chest Pain Type", ["Typical Angina", "Atypical Angina", "Non-Anginal", "Asymptomatic"])
+exercise_angina = st.sidebar.selectbox("Exercise-Induced Angina", ["Yes", "No"])
+oldpeak = st.sidebar.text_input("Oldpeak (ST depression) (0.0 - 6.0)", "1.0")
+max_hr = st.sidebar.text_input("Max Heart Rate Achieved (60 - 220)", "120")
+
+# Convert text input to float/int and handle errors
+try:
+    oldpeak = float(oldpeak)
+    max_hr = int(max_hr)
+    if oldpeak < 0.0 or oldpeak > 6.0:
+        st.sidebar.error("Oldpeak must be between 0.0 and 6.0")
+    if max_hr < 60 or max_hr > 220:
+        st.sidebar.error("Max Heart Rate must be between 60 and 220")
+except ValueError:
+    st.sidebar.error("Please enter valid numeric values for Oldpeak and Max Heart Rate.")
+
+# Manually map categorical values
+slope_mapping = {"Up": 0, "Flat": 1, "Down": 2}
+chest_pain_mapping = {"Typical Angina": 0, "Atypical Angina": 1, "Non-Anginal": 2, "Asymptomatic": 3}
+exercise_angina_mapping = {"No": 0, "Yes": 1}
+
+# Convert inputs
+st_slope_encoded = slope_mapping[st_slope]
+chest_pain_encoded = chest_pain_mapping[chest_pain]
+exercise_angina_encoded = exercise_angina_mapping[exercise_angina]
+
+# Prepare input data
+input_data = np.array([[st_slope_encoded, chest_pain_encoded, exercise_angina_encoded, oldpeak, max_hr]])
+
+# Predict
+if st.sidebar.button("Predict"):
+    prediction = model.predict(input_data)
+    result = "Heart Disease Detected ❗" if prediction[0] == 1 else "No Heart Disease ✅"
+    st.subheader("Prediction Result:")
+    st.markdown(f'<div class="prediction-box">{result}</div>', unsafe_allow_html=True)
